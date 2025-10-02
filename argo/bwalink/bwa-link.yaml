@@ -1,0 +1,61 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: bwalink-config
+  namespace: bwalink
+data:
+  BRIDGE_IP: "172.21.2.138"
+  BRIDGE_PORT: "8899"
+  LOG_LEVEL: "DEBUG"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bwalink
+  namespace: bwalink
+  labels:
+    app: bwalink
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: bwalink
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
+  template:
+    metadata:
+      labels:
+        app: bwalink
+    spec:
+      # tighten defaults a bit
+      securityContext:
+        runAsUser: 568
+        runAsGroup: 568
+        fsGroup: 568
+        fsGroupChangePolicy: OnRootMismatch
+      containers:
+        - name: bwalink
+          image: ghcr.io/vmangelschots/bwalink:latest
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - secretRef:
+                name: bwalink-mqtt
+            - configMapRef:
+                name: bwalink-config
+          resources:
+            requests:
+              cpu: 10m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+      terminationGracePeriodSeconds: 10
+

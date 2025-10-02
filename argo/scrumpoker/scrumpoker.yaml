@@ -123,10 +123,14 @@ metadata:
   name: scrumpoker
   namespace: scrumpoker
   annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-dns01
     traefik.ingress.kubernetes.io/router.entrypoints: websecure
 spec:
+  tls:
+    - hosts: [scrumpoker.mangelschots.org]
+      secretName: scrumpoker-tls
   rules:
-    - host: scrumpoker.olympus.internal   
+    - host: scrumpoker.mangelschots.org   
       http:
         paths:
           - path: /

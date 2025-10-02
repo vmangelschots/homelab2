@@ -1,0 +1,15 @@
+# Persistent volume claim (uses your NFS StorageClass)
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: actual-data
+  namespace: actual
+  labels:
+    app.kubernetes.io/name: actual
+spec:
+  accessModes: ["ReadWriteMany"]
+  storageClassName: nfs-retain
+  resources:
+    requests:
+      storage: 5Gi
+
