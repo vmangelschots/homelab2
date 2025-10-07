@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: media-library-movies-ro-pv
+spec:
+  capacity:
+    storage: 10Ti
+  accessModes: ["ReadOnlyMany"]
+  nfs:
+    server: 192.168.30.4         
+    path: /mnt/large_pool/movies           
+  persistentVolumeReclaimPolicy: Retain
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: media-library-series-ro-pv
+spec:
+  capacity:
+    storage: 10Ti
+  accessModes: ["ReadOnlyMany"]
+  nfs:
+    server: 192.168.30.4
+    path: /mnt/large_pool/series
+  persistentVolumeReclaimPolicy: Retain
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: media-library-nederlandse-films-ro-pv
+spec:
+  capacity:
+    storage: 10Ti
+  accessModes: ["ReadOnlyMany"]
+  nfs:
+    server: 192.168.30.4
+    path: /mnt/large_pool/nederlandse_films
+  persistentVolumeReclaimPolicy: Retain

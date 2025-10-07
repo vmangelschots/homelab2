@@ -1,0 +1,113 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jellyfin
+  namespace: jellyfin 
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: jellyfin
+  template:
+    metadata:
+      labels:
+        app: jellyfin
+    spec:
+      # Mount /dev/dri from the host for VAAPI/QSV
+
+      volumes:
+        - name: dev-dri
+          hostPath:
+            path: /dev/dri
+            type: Directory
+        - name: config
+          persistentVolumeClaim:
+            claimName: jellyfin-config
+        - name: movies
+          persistentVolumeClaim:
+            claimName: movies-library
+
+        - name: series 
+          persistentVolumeClaim:
+            claimName: series-library
+
+        - name: nederlandse-films 
+          persistentVolumeClaim:
+            claimName: nederlandse-films-library
+
+      containers:
+        - name: jellyfin
+          image: jellyfin/jellyfin:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8096   # HTTP
+          env:
+            - name: JELLYFIN_PublishedServerUrl
+              value: "https://movies.mangelschots.org" 
+          volumeMounts:
+            - name: dev-dri
+              mountPath: /dev/dri
+              readOnly: true
+            - name: config
+              mountPath: /config
+            - name: movies
+              mountPath: /media/movies
+              readOnly: true
+            - name: series 
+              mountPath: /media/series
+              readOnly: true
+            - name: nederlandse-films 
+              mountPath: /media/nederlandse-films
+              readOnly: true
+          securityContext:
+            runAsUser: 65543 
+            runAsGroup: 65543
+            allowPrivilegeEscalation: false
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "1Gi"
+            limits:
+              cpu: "4"
+              memory: "8Gi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jellyfin
+  namespace: jellyfin 
+spec:
+  selector:
+    app: jellyfin
+  ports:
+    - name: http
+      port: 8096
+      targetPort: 8096
+  type: ClusterIP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: jellyfin
+  namespace: jellyfin 
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-dns-01
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: movies.mangelschots.org 
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: jellyfin
+                port:
+                  number: 8096
+  tls:
+    - hosts:
+      - movies.mangelschots.org
+      secretName: jellyfin-tls

@@ -1,0 +1,79 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vaultwarden
+  namespace: vaultwarden
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vaultwarden
+  template:
+    metadata:
+      labels:
+        app: vaultwarden
+    spec:
+      securityContext:
+        runAsUser: 65534
+        runAsGroup: 65534
+      containers:
+      - name: vaultwarden
+        image: vaultwarden/server:latest
+        imagePullPolicy: Always
+        env:
+          - name: ADMIN_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: vaultwarden-admin
+                key: token
+          - name: SIGNUPS_ALLOWED
+            value: "false"   # disable open registration
+        ports:
+          - containerPort: 80
+        volumeMounts:
+          - mountPath: /data
+            name: vaultwarden-data
+      volumes:
+        - name: vaultwarden-data
+          persistentVolumeClaim:
+            claimName: vaultwarden-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vaultwarden
+  namespace: vaultwarden
+spec:
+  type: ClusterIP
+  selector:
+    app: vaultwarden
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: vaultwarden
+  namespace: vaultwarden
+  annotations:
+    kubernetes.io/ingress.class: traefik
+    cert-manager.io/cluster-issuer: letsencrypt-dns01
+spec:
+  rules:
+    - host: vault.mangelschots.org
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: vaultwarden
+                port:
+                  number: 80
+  tls:
+    - hosts:
+        - vault.mangelschots.org
+      secretName: vaultwarden-tls

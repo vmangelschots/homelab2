@@ -1,0 +1,52 @@
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: movies-library
+  namespace: jellyfin 
+spec:
+  storageClassName: ""
+  accessModes: ["ReadOnlyMany"]
+  volumeName: media-library-movies-ro-pv
+  resources:
+    requests:
+      storage: 10Ti
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: series-library
+  namespace: jellyfin 
+spec:
+  storageClassName: ""
+  accessModes: ["ReadOnlyMany"]
+  volumeName: media-library-series-ro-pv
+  resources:
+    requests:
+      storage: 10Ti
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: nederlandse-films-library
+  namespace: jellyfin 
+spec:
+  storageClassName: ""
+  accessModes: ["ReadOnlyMany"]
+  volumeName: media-library-nederlandse-films-ro-pv
+  resources:
+    requests:
+      storage: 10Ti
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: jellyfin-config
+  namespace: jellyfin
+spec:
+  accessModes: ["ReadWriteMany"]
+  storageClassName: nfs-retain
+  resources:
+    requests:
+      storage: 5Gi
+
