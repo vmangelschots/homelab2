@@ -14,6 +14,8 @@ spec:
       labels:
         app: jellyfin
     spec:
+      nodeSelector:
+        kubernetes.io/hostname: argus
       # Mount /dev/dri from the host for VAAPI/QSV
 
       volumes:
@@ -61,8 +63,8 @@ spec:
               mountPath: /media/nederlandse-films
               readOnly: true
           securityContext:
-            runAsUser: 65543 
-            runAsGroup: 65543
+            runAsUser: 65534 
+            runAsGroup: 65534
             allowPrivilegeEscalation: false
           resources:
             requests:
