@@ -37,16 +37,23 @@ spec:
         - name: nederlandse-films 
           persistentVolumeClaim:
             claimName: nederlandse-films-library
+        - name: transcode
+          emptyDir:
+            sizeLimit: 20Gi
 
       containers:
         - name: jellyfin
-          image: jellyfin/jellyfin:latest
+          image: lscr.io/linuxserver/jellyfin:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8096   # HTTP
           env:
             - name: JELLYFIN_PublishedServerUrl
               value: "https://movies.mangelschots.org" 
+            - name: PUID
+              value: "65534"
+            - name: PGID
+              value: "65534"
           volumeMounts:
             - name: dev-dri
               mountPath: /dev/dri
@@ -62,6 +69,8 @@ spec:
             - name: nederlandse-films 
               mountPath: /media/nederlandse-films
               readOnly: true
+            - name: transcode
+              mountPath: /transcode
           securityContext:
             runAsUser: 65534 
             runAsGroup: 65534
