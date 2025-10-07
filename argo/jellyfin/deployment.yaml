@@ -50,10 +50,6 @@ spec:
           env:
             - name: JELLYFIN_PublishedServerUrl
               value: "https://movies.mangelschots.org" 
-            - name: PUID
-              value: "65534"
-            - name: PGID
-              value: "65534"
           volumeMounts:
             - name: dev-dri
               mountPath: /dev/dri
@@ -71,10 +67,6 @@ spec:
               readOnly: true
             - name: transcode
               mountPath: /transcode
-          securityContext:
-            runAsUser: 65534 
-            runAsGroup: 65534
-            allowPrivilegeEscalation: false
           resources:
             requests:
               cpu: "500m"
