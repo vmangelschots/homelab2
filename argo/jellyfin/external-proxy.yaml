@@ -1,0 +1,64 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: jellyfin
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jellyfin-external
+  namespace: jellyfin
+spec:
+  # No selector: we'll provide Endpoints manually
+  ports:
+    - name: http
+      port: 80           # what Traefik will send to
+      targetPort: 8096   # Jellyfin default HTTP port on the LXC
+      protocol: TCP
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: jellyfin-external
+  namespace: jellyfin
+subsets:
+  - addresses:
+      - ip: 192.168.20.200   # <— your LXC
+    ports:
+      - name: http
+        port: 8096
+        protocol: TCP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: jellyfin
+  namespace: jellyfin
+  annotations:
+    kubernetes.io/ingress.class: traefik
+    # Optional but nice-to-have:
+    traefik.ingress.kubernetes.io/router.entrypoints: web,websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+    traefik.ingress.kubernetes.io/service.serversscheme: http
+    cert-manager.io/cluster-issuer: letsencrypt-dns01
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: movies.mangelschots.org 
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: jellyfin-external
+                port:
+                  number: 80
+  tls:
+    - hosts:
+        - movies.mangelschots.org
+      # If you use cert-manager, add secretName. If not, Traefik’s default/self-signed will be used.
+      secretName: movies-mangelschots-org-secret.tls
+
