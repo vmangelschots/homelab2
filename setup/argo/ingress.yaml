@@ -1,0 +1,24 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: argocd-server
+  namespace: argocd
+  annotations:
+    kubernetes.io/ingress.className: traefik
+spec:
+  rules:
+  - host: argocd.olympus.internal
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: argocd-server
+            port:
+              number: 80 
+  tls:
+  - hosts:
+    - argocd.olympus.internal
+    secretName: argocd-server-tls
+

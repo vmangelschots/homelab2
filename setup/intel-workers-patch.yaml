@@ -1,0 +1,10 @@
+machine:
+  kernel:
+    modules: []
+  udev:
+    # Give render/drm devices a sane group/permission for containers
+    rules:
+      - 'KERNEL=="renderD*", GROUP="44", MODE="0660", TAG+="uaccess"'
+      - 'KERNEL=="card*", SUBSYSTEM=="drm", GROUP="44", MODE="0660"'
+      - 'KERNEL=="controlD*", SUBSYSTEM=="drm", GROUP="44", MODE="0660"'
+

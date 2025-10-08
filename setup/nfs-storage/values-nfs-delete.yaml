@@ -1,0 +1,16 @@
+nfs:
+  server: 192.168.30.4
+  path: /mnt/large_pool/k8s/deletepool
+  mountOptions:
+    - nfsvers=4.1
+    - noatime
+
+storageClass:
+  name: nfs-delete
+  defaultClass: false
+  reclaimPolicy: Delete
+  accessModes: ReadWriteMany
+  allowVolumeExpansion: true
+  pathPattern: "scratch/${.PVC.namespace}/${.PVC.name}"
+  archiveOnDelete: true          # safety net for accidental deletes
+

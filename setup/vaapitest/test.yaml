@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Pod
+metadata: { name: vaapi-test }
+spec:
+  restartPolicy: Never
+  securityContext:
+    fsGroup: 44
+    supplementalGroups: [44]
+  containers:
+  - name: test
+    image: jrottenberg/ffmpeg:6.1-vaapi
+    command: ["/bin/sh","-lc"]
+    args:
+      - (vainfo || (apt-get update && apt-get install -y vainfo && vainfo)) || sleep 3600
+
+    resources:
+      limits:
+        gpu.intel.com/i915: 1

@@ -1,0 +1,17 @@
+machine:
+  network:
+    hostname: hercules.olympus.internal
+    interfaces:
+      - interface: ens18
+        addresses:
+          - 192.168.20.21/24
+        routes:
+          - network: 0.0.0.0/0
+            gateway: 192.168.20.1
+        dhcp: false
+      - interface: ens19
+        addresses:
+          - 192.168.30.21/24
+        dhcp: false
+      - interface: ens20
+        dhcp: false

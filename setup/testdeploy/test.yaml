@@ -1,0 +1,109 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: demo
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: hello-pvc
+  namespace: demo
+spec:
+  accessModes: ["ReadWriteMany"]
+  storageClassName: nfs-delete
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hello-nginx
+  namespace: demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: hello-nginx }
+  template:
+    metadata:
+      labels: { app: hello-nginx }
+    spec:
+      initContainers:
+        - name: init-site
+          image: busybox:1.36
+          command: ["/bin/sh","-c"]
+          args:
+            - |
+              set -eu
+              mkdir -p /data
+              cat >/data/index.html <<'HTML'
+              <!doctype html>
+              <html>
+              <head>
+                <meta charset="utf-8"/>
+                <title>Hello from Kubernetes</title>
+                <style>body{font-family:system-ui;margin:3rem}code{background:#eee;padding:.2em .4em;border-radius:.25rem}</style>
+              </head>
+              <body>
+                <h1>✅ Hello via Traefik + NFS PVC</h1>
+                <p>This page is served by <strong>NGINX</strong> from a <strong>PersistentVolume</strong>.</p>
+                <ul>
+                  <li>Namespace: <code>demo</code></li>
+                  <li>PVC: <code>hello-pvc</code></li>
+                </ul>
+              </body>
+              </html>
+              HTML
+          volumeMounts:
+            - name: site
+              mountPath: /data
+      containers:
+        - name: nginx
+          image: nginx:1.27-alpine
+          ports:
+            - containerPort: 80
+          volumeMounts:
+            - name: site
+              mountPath: /usr/share/nginx/html
+      volumes:
+        - name: site
+          persistentVolumeClaim:
+            claimName: hello-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hello-svc
+  namespace: demo
+spec:
+  selector:
+    app: hello-nginx
+  ports:
+    - port: 80
+      targetPort: 80
+---
+# Ingress for Traefik
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: hello
+  namespace: demo
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: test.olympus.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: hello-svc
+                port:
+                  number: 80
+  # If Traefik forces HTTP->HTTPS (you enabled redirect), include TLS:
+  # Remove this block if you've disabled the global redirect and want pure HTTP.
+  tls:
+    - hosts: ["test.olympus.local"]
+      secretName: test-olympus-local-tls
+

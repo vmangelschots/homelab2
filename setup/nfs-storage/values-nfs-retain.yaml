@@ -1,0 +1,16 @@
+nfs:
+  server: 192.168.30.4
+  path: /mnt/large_pool/k8s/retain
+  mountOptions:
+    - nfsvers=4.1
+    - noatime
+
+storageClass:
+  name: nfs-retain
+  defaultClass: true            # make Retain the safe default
+  reclaimPolicy: Retain
+  accessModes: ReadWriteMany
+  allowVolumeExpansion: true
+  pathPattern: "${.PVC.namespace}/${.PVC.name}"
+  archiveOnDelete: false
+

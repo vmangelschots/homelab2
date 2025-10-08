@@ -1,0 +1,28 @@
+# Basic, sane defaults
+additionalArguments:
+  - "--providers.kubernetescrd"
+  - "--providers.kubernetesingress"
+  - "--api.dashboard=true"
+
+ingressClass:
+  enabled: true
+  isDefaultClass: true # keep explicit; easy to switch later
+  name: traefik
+
+service:
+  type: LoadBalancer
+  loadBalancerIP: 192.168.40.101
+  spec:
+    externalTrafficPolicy: Local
+
+# Optional: Prometheus metrics (handy later)
+metrics:
+  prometheus:
+    enabled: true
+
+# Only expose dashboard via HTTPS entrypoint (we’ll protect it next)
+ingressRoute:
+  dashboard:
+    enabled: true
+    entryPoints: ["websecure"]
+
