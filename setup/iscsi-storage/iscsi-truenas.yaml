@@ -1,0 +1,70 @@
+driver:
+  config:
+    driver: freenas-api-iscsi
+    httpConnection:
+      protocol: https
+      apiKey: 2-GwP3jZsIXgs7wqAUdin3HHjA0HCQJU1OL0gmznIQVAnic6rfCczuIv0q9nwahDmB
+      host: 192.168.30.4
+      port: 443
+      allowInsecure: true
+    zfs:
+      datasetParentName: /mnt/large_pool/k8s_iscsi/volumes
+      detachedSnapshotsDatasetParentName: /mnt/large_pool/k8s_iscsi/snapshots
+      zvolCompression:
+      zvolDedup:
+      zvolEnableReservation: false
+      zvolBlockSize:
+    iscsi:
+      targetPortal: "192.168.30.4:3260"
+      targetPortals: []
+      interface:
+      namePrefix: csi-
+      nameSuffix: "-talos"
+      targetGroups:
+        - targetGroupPortalGroup: 1
+          targetGroupInitiatorGroup: 2
+          targetGroupAuthType: None
+          targetGroupAuthGroup:
+      extentInsecureTpc: true
+      extentXenCompat: false
+      extentDisablePhysicalBlocksize: true
+      extentBlocksize: 512
+      extentRpm: "SSD"
+      extentAvailThreshold: 0
+ 
+csiDriver:
+  # should be globally unique for a given cluster
+  name: "org.democratic-csi.freenas-api-iscsi"
+ 
+storageClasses:
+  - name: truenas-iscsi
+    defaultClass: true
+    reclaimPolicy: Retain 
+    volumeBindingMode: Immediate
+    allowVolumeExpansion: true
+    parameters:
+      fsType: ext4
+      detachedVolumesFromSnapshots: "false"
+    mountOptions: []
+    secrets:
+      provisioner-secret:
+      controller-publish-secret:
+      node-stage-secret:
+      node-publish-secret:
+      controller-expand-secret:
+ 
+#volumeSnapshotClasses:
+#  - name: truenas-iscsi
+#    parameters:
+#      detachedSnapshots: "true"
+
+node:
+  hostPID: true
+  driver:
+    extraEnv:
+      - name: ISCSIADM_HOST_STRATEGY
+        value: nsenter
+      - name: ISCSIADM_HOST_PATH
+        value: /usr/local/sbin/iscsiadm
+    iscsiDirHostPath: /usr/local/etc/iscsi
+    iscsiDirHostPathType: ""

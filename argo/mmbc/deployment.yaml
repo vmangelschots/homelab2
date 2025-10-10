@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mmbc        # < name of the deployment
+  namespace: mmbc   # < namespace where place the deployment and pods
+  labels:
+    app: mmbc      # < label for tagging and reference
+spec:
+  replicas: 1           # < number of pods to deploy
+  selector:
+    matchLabels:
+      app: mmbc
+  strategy:
+    rollingUpdate:
+      maxSurge: 0       # < The number of pods that can be created above the desired amount of pods during an update
+      maxUnavailable: 1 # < The number of pods that can be unavailable during the update process
+    type: RollingUpdate # < New pods are added gradually, and old pods are terminated gradually
+  template:
+    metadata:
+      labels:
+        app: mmbc
+    spec:
+      containers:
+      - image: ghcr.io/vmangelschots/mmbc:dev # < the name of the docker image we will use
+        name: mmbc                      # < name of container
+        imagePullPolicy: Always             # < always use the latest image when creating container/pod
+        env:                                # < the environment variables required (see container documentation)
+        - name: P1_HOST
+          value: "http://172.21.2.226"
+        - name: BATTERY_1_IP
+          value: "192.168.6.52" #
+        - name: BATTERY_1_ADDRESS
+          value: '1'
+        - name: BATTERY_2_IP
+          value: "192.168.6.52" 
+        - name: BATTERY_2_ADDRESS
+          value: '2'
+        - name: INTERVAL_SECONDS
+          value: '3'
+        - name: MQTT_HOST
+          value: "172.21.0.3"
