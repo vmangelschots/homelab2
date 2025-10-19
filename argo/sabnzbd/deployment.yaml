@@ -6,7 +6,6 @@ metadata:
 
 
 ---
-# Persistent volumes (NFS by default per your cluster)
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -21,16 +20,46 @@ spec:
 
 ---
 apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: downloads-nfs-pv
+  labels:
+    app: sabnzbd
+    pv-role: downloads
+spec:
+  capacity:
+    storage: 2Ti            # not enforced by NFS; set a sensible number for bookkeeping
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: nfs-static             # static class name to avoid dynamic provisioning
+  mountOptions:
+    - nfsvers=4.1
+    - rsize=1048576
+    - wsize=1048576
+    - hard
+    - timeo=600
+    - retrans=2
+    - noatime
+  nfs:
+    server: 192.168.30.4
+    path: /mnt/large_pool/downloads                   # e.g., /tank/media/downloads
+---
+apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: sabnzbd-downloads
   namespace: sabnzbd
 spec:
-  accessModes: ["ReadWriteMany"]
-  storageClassName: nfs-delete
+  accessModes:
+    - ReadWriteMany
   resources:
     requests:
-      storage: 200Gi
+      storage: 2Ti
+  storageClassName: nfs-static
+  selector:
+    matchLabels:
+      pv-role: downloads
 
 ---
 apiVersion: apps/v1
