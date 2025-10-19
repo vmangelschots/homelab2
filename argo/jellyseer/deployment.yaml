@@ -1,0 +1,105 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: jellyseerr
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: jellyseerr-config
+  namespace: jellyseerr
+spec:
+  accessModes: ["ReadWriteMany"]
+  storageClassName: nfs-retain
+  resources:
+    requests:
+      storage: 1Gi
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jellyseerr
+  namespace: jellyseerr
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: jellyseerr
+  template:
+    metadata:
+      labels:
+        app: jellyseerr
+    spec:
+      securityContext:
+        fsGroup: 65534                 # keep NFS perms consistent with the rest of your stack
+        fsGroupChangePolicy: OnRootMismatch
+      containers:
+        - name: jellyseerr
+          image: fallenbagel/jellyseerr:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5055
+          env:
+            - name: TZ
+              value: "Europe/Brussels"
+          volumeMounts:
+            - name: config
+              mountPath: /app/config
+          startupProbe:
+            httpGet: { path: /, port: 5055 }
+            failureThreshold: 30
+            periodSeconds: 2
+          readinessProbe:
+            httpGet: { path: /, port: 5055 }
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /, port: 5055 }
+            periodSeconds: 10
+      volumes:
+        - name: config
+          persistentVolumeClaim:
+            claimName: jellyseerr-config
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jellyseerr
+  namespace: jellyseerr
+spec:
+  selector:
+    app: jellyseerr
+  ports:
+    - name: http
+      port: 80
+      targetPort: 5055
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: jellyseerr
+  namespace: jellyseerr
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-dns01
+    traefik.ingress.kubernetes.io/router.middlewares: "default-internal-whitelist@kubernetescrd"
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts: ["requests.mangelschots.org"]
+      secretName: jellyseerr-cert
+  rules:
+    - host: requests.mangelschots.org
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: jellyseerr
+                port:
+                  number: 80
+

@@ -1,0 +1,197 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: radarr
+
+---
+# Sonarr DOWNLOADS: its own PV (points to the same NFS export as SAB, but unique PV)
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: downloads-nfs-pv-radarr
+  labels:
+    app: radarr
+    pv-role: downloads
+spec:
+  capacity:
+    storage: 2Ti
+  accessModes: ["ReadWriteMany"]
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: nfs-static
+  mountOptions:
+    - nfsvers=4.1
+    - rsize=1048576
+    - wsize=1048576
+    - hard
+    - timeo=600
+    - retrans=2
+    - noatime
+  nfs:
+    server: 192.168.30.4
+    path: /mnt/large_pool/downloads
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: radarr-config
+  namespace: radarr
+spec:
+  accessModes: ["ReadWriteMany"]
+  storageClassName: nfs-retain
+  resources:
+    requests:
+      storage: 1Gi
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: radarr-downloads
+  namespace: radarr
+spec:
+  accessModes: ["ReadWriteMany"]
+  resources:
+    requests:
+      storage: 2Ti
+  storageClassName: nfs-static
+  selector:
+    matchLabels:
+      app: radarr
+      pv-role: downloads
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: radarr
+  namespace: radarr
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: radarr
+  template:
+    metadata:
+      labels:
+        app: radarr
+    spec:
+      containers:
+        - name: radarr
+          image: lscr.io/linuxserver/radarr:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 7878
+          env:
+            - name: PUID
+              value: "65534"
+            - name: PGID
+              value: "65534"
+            - name: TZ
+              value: "Europe/Brussels"
+          volumeMounts:
+            - name: config
+              mountPath: /config
+            - name: downloads
+              mountPath: /data/downloads
+            - name: movies-library
+              mountPath: /data/movies
+          startupProbe:
+            httpGet: { path: /, port: 7878 }
+            failureThreshold: 30
+            periodSeconds: 2
+          readinessProbe:
+            httpGet: { path: /, port: 7878 }
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /, port: 7878 }
+            periodSeconds: 10
+      volumes:
+        - name: config
+          persistentVolumeClaim:
+            claimName: radarr-config
+        - name: downloads
+          persistentVolumeClaim:
+            claimName: radarr-downloads
+        - name: movies-library
+          persistentVolumeClaim:
+            claimName: movies-library
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: movies-library
+  namespace: radarr
+spec:
+  accessModes: ["ReadWriteMany"]
+  storageClassName: nfs-retain
+  resources:
+    requests:
+      storage: 4Ti  # arbitrary bookkeeping value
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: movies-nfs-pv
+  labels:
+    app: radarr
+    pv-role: movies
+spec:
+  capacity:
+    storage: 4Ti
+  accessModes: ["ReadWriteMany"]
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: nfs-static
+  nfs:
+    path: /mnt/large_pool/movies
+    server: 192.168.30.4  # <== replace with your NAS IP
+  mountOptions:
+    - nfsvers=4.1
+    - rsize=1048576
+    - wsize=1048576
+    - hard
+    - noatime
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: radarr
+  namespace: radarr
+spec:
+  selector:
+    app: radarr
+  ports:
+    - name: http
+      port: 80
+      targetPort: 7878
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: radarr
+  namespace: radarr
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-dns01
+    traefik.ingress.kubernetes.io/router.middlewares: "default-internal-whitelist@kubernetescrd"
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - radarr.mangelschots.org
+      secretName: radarr-cert
+  rules:
+    - host: radarr.mangelschots.org
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: radarr
+                port:
+                  number: 80
+
