@@ -117,7 +117,6 @@ spec:
         - name: movies-library
           persistentVolumeClaim:
             claimName: movies-library
-
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -126,10 +125,14 @@ metadata:
   namespace: radarr
 spec:
   accessModes: ["ReadWriteMany"]
-  storageClassName: nfs-retain
   resources:
     requests:
-      storage: 4Ti  # arbitrary bookkeeping value
+      storage: 2Ti
+  storageClassName: nfs-static
+  selector:
+    matchLabels:
+      app: radarr
+
 ---
 apiVersion: v1
 kind: PersistentVolume
