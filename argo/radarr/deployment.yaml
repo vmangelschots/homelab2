@@ -5,33 +5,6 @@ metadata:
   name: radarr
 
 ---
-# Sonarr DOWNLOADS: its own PV (points to the same NFS export as SAB, but unique PV)
-apiVersion: v1
-kind: PersistentVolume
-metadata:
-  name: downloads-nfs-pv-radarr
-  labels:
-    app: radarr
-    pv-role: downloads
-spec:
-  capacity:
-    storage: 2Ti
-  accessModes: ["ReadWriteMany"]
-  persistentVolumeReclaimPolicy: Retain
-  storageClassName: nfs-static
-  mountOptions:
-    - nfsvers=4.1
-    - rsize=1048576
-    - wsize=1048576
-    - hard
-    - timeo=600
-    - retrans=2
-    - noatime
-  nfs:
-    server: 192.168.30.4
-    path: /mnt/large_pool/downloads
-
----
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -43,23 +16,6 @@ spec:
   resources:
     requests:
       storage: 1Gi
-
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: radarr-downloads
-  namespace: radarr
-spec:
-  accessModes: ["ReadWriteMany"]
-  resources:
-    requests:
-      storage: 2Ti
-  storageClassName: nfs-static
-  selector:
-    matchLabels:
-      app: radarr
-      pv-role: downloads
 
 ---
 apiVersion: apps/v1
@@ -129,10 +85,7 @@ spec:
     requests:
       storage: 2Ti
   storageClassName: nfs-static
-  selector:
-    matchLabels:
-      app: radarr
-
+  volumeName: movies-nfs-pv
 ---
 apiVersion: v1
 kind: PersistentVolume
