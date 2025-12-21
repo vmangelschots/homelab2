@@ -1,0 +1,274 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: bazarr
+
+---
+# Sonarr CONFIG (same pattern as sabnzbd-config PVC; uses your nfs-retain class)
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: bazarr-config
+  namespace: bazarr
+spec:
+  accessModes: ["ReadWriteMany"]
+  storageClassName: nfs-retain
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: series-nfs-pv-bazarr
+  labels:
+    app: bazarr
+    pv-role: series
+spec:
+  capacity:
+    storage: 2Ti
+  accessModes: ["ReadWriteMany"]
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: nfs-static
+  mountOptions:
+    - nfsvers=4.1
+    - rsize=1048576
+    - wsize=1048576
+    - hard
+    - timeo=600
+    - retrans=2
+    - noatime
+  nfs:
+    server: 192.168.30.4
+    path: /mnt/large_pool/series
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: bazarr-series
+  namespace: bazarr
+spec:
+  accessModes: ["ReadWriteMany"]
+  resources:
+    requests:
+      storage: 2Ti
+  storageClassName: nfs-static
+  selector:
+    matchLabels:
+      app: bazarr
+      pv-role: series
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bazarr
+  namespace: bazarr
+  labels:
+    app.kubernetes.io/name: bazarr
+    app.kubernetes.io/instance: bazarr
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: bazarr
+      app.kubernetes.io/instance: bazarr
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: bazarr
+        app.kubernetes.io/instance: bazarr
+    spec:
+      securityContext:
+        fsGroup: 65534
+        fsGroupChangePolicy: OnRootMismatch
+      containers:
+        - name: bazarr
+          image: lscr.io/linuxserver/bazarr:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            - { name: PUID, value: "65534" }
+            - { name: PGID, value: "65534" }
+            - { name: TZ,   value: "Europe/Brussels" }
+          ports:
+            - { name: http, containerPort: 6767, protocol: TCP }
+          volumeMounts:
+            - { name: config,    mountPath: /config }
+            - { name: series,    mountPath: /data/series }
+            - { name: movies, mountPath: /data/movies }
+          readinessProbe:
+            httpGet: { path: /, port: http }
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 6
+          livenessProbe:
+            httpGet: { path: /, port: http }
+            initialDelaySeconds: 60
+            periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 6
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits:   { cpu: "2",  memory: 2Gi }
+      terminationGracePeriodSeconds: 30
+      volumes:
+        - name: config
+          persistentVolumeClaim:
+            claimName: bazarr-config
+        - name: series
+          persistentVolumeClaim:
+            claimName: bazarr-series
+        - name: movies
+          persistentVolumeClaim:
+            claimName: bazarr-movies
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: bazarr
+  namespace: bazarr
+  labels:
+    app.kubernetes.io/name: bazarr
+    app.kubernetes.io/instance: bazarr
+spec:
+  selector:
+    app.kubernetes.io/name: bazarr
+    app.kubernetes.io/instance: bazarr
+  ports:
+    - name: http
+      protocol: TCP
+      port: 6767 
+      targetPort: http
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: bazarr
+  namespace: bazarr
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-dns01
+    traefik.ingress.kubernetes.io/router.middlewares: default-internal-whitelist@kubernetescrd
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts: [bazarr.mangelschots.org]
+      secretName: bazarr-mangelschots-org-tls
+  rules:
+    - host: bazarr.mangelschots.org
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: bazarr
+                port:
+                  number: 6767 
+
+---
+# Sonarr Prometheus exporter (exportarr)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bazarr-exporter
+  namespace: bazarr
+  labels:
+    app.kubernetes.io/name: bazarr-exporter
+    app.kubernetes.io/instance: bazarr-exporter
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: bazarr-exporter
+      app.kubernetes.io/instance: bazarr-exporter
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: bazarr-exporter
+        app.kubernetes.io/instance: bazarr-exporter
+    spec:
+      containers:
+        - name: exporter
+          image: ghcr.io/onedr0p/exportarr:v2.0.1
+          args: ["bazarr"]
+          env:
+            - name: URL
+              value: "http://bazarr:6767"
+            - name: API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: bazarr-api-key
+                  key: api_key
+            - name: PORT
+              value: "9707"
+          ports:
+            - { name: metrics, containerPort: 9707, protocol: TCP }
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: bazarr-exporter
+  namespace: bazarr
+  labels:
+    app.kubernetes.io/name: bazarr-exporter
+    app.kubernetes.io/instance: bazarr-exporter
+spec:
+  selector:
+    app.kubernetes.io/name: bazarr-exporter
+    app.kubernetes.io/instance: bazarr-exporter
+  ports:
+    - name: metrics
+      protocol: TCP
+      port: 9707
+      targetPort: metrics
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: movies-nfs-pv-bazarr
+  labels:
+    app: bazarr
+    pv-role: movies
+spec:
+  capacity:
+    storage: 2Ti
+  accessModes: ["ReadWriteMany"]
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: nfs-static
+  mountOptions:
+    - nfsvers=4.1
+    - rsize=1048576
+    - wsize=1048576
+    - hard
+    - timeo=600
+    - retrans=2
+    - noatime
+  nfs:
+    server: 192.168.30.4
+    path: /mnt/large_pool/movies
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: bazarr-movies
+  namespace: bazarr
+spec:
+  accessModes: ["ReadWriteMany"]
+  resources:
+    requests:
+      storage: 2Ti
+  storageClassName: nfs-static
+  selector:
+    matchLabels:
+      app: bazarr
+      pv-role: movies
+
+---
+
