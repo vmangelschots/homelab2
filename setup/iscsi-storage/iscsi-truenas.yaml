@@ -8,12 +8,14 @@ driver:
       port: 443
       allowInsecure: true
     zfs:
-      datasetParentName: /mnt/large_pool/k8s_iscsi/volumes
-      detachedSnapshotsDatasetParentName: /mnt/large_pool/k8s_iscsi/snapshots
+      datasetParentName: large_pool/k8s_iscsi/volumes
+      detachedSnapshotsDatasetParentName: large_pool/k8s_iscsi/snapshots
       zvolCompression:
       zvolDedup:
       zvolEnableReservation: false
       zvolBlockSize:
+      datasetProperties:
+        "org.freenas:description": "{{ parameters.[csi.storage.k8s.io/pvc/namespace] }}/{{ parameters.[csi.storage.k8s.io/pvc/name] }}" 
     iscsi:
       targetPortal: "192.168.30.4:3260"
       targetPortals: []
@@ -66,5 +68,5 @@ node:
         value: nsenter
       - name: ISCSIADM_HOST_PATH
         value: /usr/local/sbin/iscsiadm
-    iscsiDirHostPath: /usr/local/etc/iscsi
+    iscsiDirHostPath: /var/etc/iscsi
     iscsiDirHostPathType: ""
