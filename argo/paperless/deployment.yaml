@@ -2,7 +2,28 @@ apiVersion: v1
 kind: Namespace
 metadata:
   name: paperless
-
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: paperless-nfs-pv-consume-export
+  labels:
+    app: paperless
+spec:
+  capacity:
+    storage: 100Gi   # logical size; NFS doesn’t enforce
+  accessModes: ["ReadWriteMany"]
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: nfs-static
+  nfs:
+    server: 192.168.30.4
+    path: /mnt/large_pool/paperless_inbox
+  mountOptions:
+    - nfsvers=4.1
+    - rsize=1048576
+    - wsize=1048576
+    - hard
+    - noatime
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -46,24 +67,12 @@ spec:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: paperless-export
+  name: paperless-export-consume
   namespace: paperless
 spec:
-  accessModes: ["ReadWriteOnce"]
-  storageClassName: truenas-iscsi
-  resources:
-    requests:
-      storage: 10Gi
-
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: paperless-consume
-  namespace: paperless
-spec:
-  accessModes: ["ReadWriteOnce"]
-  storageClassName: truenas-iscsi 
+  accessModes: ["ReadWriteMany"]
+  storageClassName: nfs-static
+  volumeName: paperless-nfs-pv-consume-export
   resources:
     requests:
       storage: 10Gi
@@ -256,16 +265,18 @@ spec:
               value: "Europe/Brussels"
             - name: PAPERLESS_PORT
               value: "8000"
-
+            - name: PAPERLESS_CONSUMER_POLLING
           volumeMounts:
             - name: data
               mountPath: /usr/src/paperless/data
             - name: media
               mountPath: /usr/src/paperless/media
-            - name: export
+            - name: consume
               mountPath: /usr/src/paperless/export
+              subPath: export
             - name: consume
               mountPath: /usr/src/paperless/consume
+              subPath: consume
 
           startupProbe:
             httpGet: { path: /, port: 8000 }
@@ -285,12 +296,9 @@ spec:
         - name: media
           persistentVolumeClaim:
             claimName: paperless-media
-        - name: export
-          persistentVolumeClaim:
-            claimName: paperless-export
         - name: consume
           persistentVolumeClaim:
-            claimName: paperless-consume
+            claimName: paperless-export-consume
 
 ---
 apiVersion: v1

@@ -1,0 +1,128 @@
+controllers:
+  main:
+    containers:
+      main:
+        env:
+          # CNPG database (required; chart provides no defaults)
+          DB_HOSTNAME:
+            valueFrom:
+              secretKeyRef:
+                name: immich-database-app
+                key: host
+          DB_PORT:
+            valueFrom:
+              secretKeyRef:
+                name: immich-database-app
+                key: port
+          DB_USERNAME:
+            valueFrom:
+              secretKeyRef:
+                name: immich-database-app
+                key: user
+          DB_PASSWORD:
+            valueFrom:
+              secretKeyRef:
+                name: immich-database-app
+                key: password
+          DB_DATABASE_NAME:
+            valueFrom:
+              secretKeyRef:
+                name: immich-database-app
+                key: dbname
+
+          # Redis/Valkey (with valkey.enabled=true, service will be "<release>-valkey")
+          # You can omit this because it defaults to "{{ Release.Name }}-valkey",
+          # but keeping it explicit makes debugging easier.
+          REDIS_HOSTNAME: immich-valkey
+          REDIS_PORT: "6379"
+
+          # ML URL default is fine, but explicit is ok:
+          IMMICH_MACHINE_LEARNING_URL: "http://immich-machine-learning:3003"
+
+# REQUIRED: library PVC is not created by the chart
+immich:
+  persistence:
+    library:
+      existingClaim: immich-library
+
+# Valkey is the in-chart Redis replacement, but it's disabled by default.
+valkey:
+  enabled: true
+
+
+# Ingress should be on the server component
+server:
+  env:
+    DB_HOSTNAME:
+      valueFrom:
+        secretKeyRef:
+          name: immich-database-app
+          key: host
+    DB_PORT:
+      valueFrom:
+        secretKeyRef:
+          name: immich-database-app
+          key: port
+    DB_USERNAME:
+      valueFrom:
+        secretKeyRef:
+          name: immich-database-app
+          key: user
+    DB_PASSWORD:
+      valueFrom:
+        secretKeyRef:
+          name: immich-database-app
+          key: password
+    DB_DATABASE_NAME:
+      valueFrom:
+        secretKeyRef:
+          name: immich-database-app
+          key: dbname
+
+microservices:
+  env:
+    DB_HOSTNAME:
+      valueFrom:
+        secretKeyRef:
+          name: immich-database-app
+          key: host
+    DB_PORT:
+      valueFrom:
+        secretKeyRef:
+          name: immich-database-app
+          key: port
+    DB_USERNAME:
+      valueFrom:
+        secretKeyRef:
+          name: immich-database-app
+          key: user
+    DB_PASSWORD:
+      valueFrom:
+        secretKeyRef:
+          name: immich-database-app
+          key: password
+    DB_DATABASE_NAME:
+      valueFrom:
+        secretKeyRef:
+          name: immich-database-app
+          key: dbname
+
+
+
+
+  ingress:
+    main:
+      enabled: true
+      ingressClassName: traefik
+      annotations:
+        cert-manager.io/cluster-issuer: letsencrypt-dns01
+      hosts:
+        - host: immich.mangelschots.org
+          paths:
+            - path: /
+              pathType: Prefix
+      tls:
+        - secretName: immich-cert
+          hosts:
+            - immich.mangelschots.org
+
