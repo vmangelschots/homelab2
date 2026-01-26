@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cellarium-frontend
+  namespace: cellarium
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cellarium-frontend
+  template:
+    metadata:
+      labels:
+        app: cellarium-frontend
+    spec:
+      containers:
+        - name: frontend
+          image: ghcr.io/vmangelschots/cellarium_frontend:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 80
+          env:
+            - name: API_BASE_URL
+              value: "https://cellarium-backend.mangelschots.org"
+      imagePullSecrets:
+        - name: regcred
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cellarium-frontend
+  namespace: cellarium
+spec:
+  selector:
+    app: cellarium-frontend
+  ports:
+    - port: 80
+      targetPort: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: cellarium-frontend
+  namespace: cellarium
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-dns01
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - wine.mangelschots.org
+      secretName: wine-cert
+  rules:
+    - host: wine.mangelschots.org
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: cellarium-frontend
+                port:
+                  number: 80
+

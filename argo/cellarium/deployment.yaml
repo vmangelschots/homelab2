@@ -1,0 +1,169 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: cellarium-media
+  namespace: cellarium
+spec:
+  storageClassName: nfs-retain
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: cellarium
+spec:
+  serviceName: postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: cellarium-secrets
+                  key: POSTGRES_DB
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: cellarium-secrets
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: cellarium-secrets
+                  key: POSTGRES_PASSWORD
+          volumeMounts:
+            - name: postgres-data
+              mountPath: /var/lib/postgresql/data
+              subPath: pgdata
+  volumeClaimTemplates:
+    - metadata:
+        name: postgres-data
+      spec:
+        storageClassName: truenas-iscsi
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 5Gi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: cellarium
+spec:
+  selector:
+    app: postgres
+  ports:
+    - port: 5432
+      targetPort: 5432
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cellarium-backend
+  namespace: cellarium
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cellarium-backend
+  template:
+    metadata:
+      labels:
+        app: cellarium-backend
+    spec:
+      containers:
+        - name: backend
+          image: ghcr.io/vmangelschots/cellarium_backend:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8000
+          env:
+            - name: SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: cellarium-secrets
+                  key: SECRET_KEY
+            - name: DEBUG
+              value: "True"
+            - name: ALLOWED_HOSTS
+              value: "*"
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: cellarium-secrets
+                  key: DATABASE_URL
+
+                
+            - name: CORS_ALLOW_ALL_ORIGINS
+              value: "True"
+          volumeMounts:
+            - name: media
+              mountPath: /app/media
+
+      imagePullSecrets:
+        - name: regcred
+      volumes:
+        - name: media
+          persistentVolumeClaim:
+            claimName: cellarium-media
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cellarium-backend
+  namespace: cellarium
+spec:
+  selector:
+    app: cellarium-backend
+  ports:
+    - port: 8000
+      targetPort: 8000
+---
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: cellarium
+  namespace: cellarium
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-dns01
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - cellarium-backend.mangelschots.org
+      secretName: cellarium-cert
+  rules:
+    - host: cellarium-backend.mangelschots.org
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: cellarium-backend 
+                port:
+                  number: 8000
