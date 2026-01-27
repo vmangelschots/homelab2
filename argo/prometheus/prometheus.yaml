@@ -27,6 +27,13 @@ data:
           - source_labels: [__name__]
             regex: 'traefik_(entrypoint|service|router)_.*'
             action: keep
+      
+      # Scrape Proxmox metrics
+      - job_name: 'proxmox'
+        static_configs:
+          - targets: ['proxmox-exporter.proxmox-exporter.svc.cluster.local:9221']
+        scrape_interval: 60s
+        scrape_timeout: 30s
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
