@@ -6,18 +6,7 @@ metadata:
     app.kubernetes.io/name: proxmox-exporter
     app.kubernetes.io/instance: proxmox-exporter
 ---
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: proxmox-exporter-config
-  namespace: proxmox-exporter
-data:
-  pve.yml: |
-    default:
-      user: prometheus@pve
-      password: ${PROXMOX_PASSWORD}
-      verify_ssl: false
----
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
