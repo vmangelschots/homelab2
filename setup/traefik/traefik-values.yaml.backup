@@ -1,3 +1,4 @@
+# Basic, sane defaults
 additionalArguments:
   - "--providers.kubernetescrd"
   - "--providers.kubernetesingress"
@@ -5,7 +6,7 @@ additionalArguments:
 
 ingressClass:
   enabled: true
-  isDefaultClass: true
+  isDefaultClass: true # keep explicit; easy to switch later
   name: traefik
 
 service:
@@ -14,11 +15,15 @@ service:
   spec:
     externalTrafficPolicy: Local
 
+# Optional: Prometheus metrics (handy later)
 metrics:
   prometheus:
-    enabled: true
-    service:
+    serviceMonitor:
       enabled: true
+#    enabled: true
+#    expose: true
+
+# Only expose dashboard via HTTPS entrypoint (we’ll protect it next)
 ingressRoute:
   dashboard:
     enabled: true

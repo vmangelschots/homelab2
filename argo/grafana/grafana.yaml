@@ -557,7 +557,7 @@ metadata:
   annotations:
     cert-manager.io/cluster-issuer: letsencrypt-dns01
     traefik.ingress.kubernetes.io/router.entrypoints: websecure
-    traefik.ingress.kubernetes.io/router.middlewares: traefik-internal-whitelist@kubernetescrd
+    traefik.ingress.kubernetes.io/router.middlewares: default-internal-whitelist@kubernetescrd
 spec:
   tls:
     - hosts: [grafana.mangelschots.org]

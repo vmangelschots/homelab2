@@ -21,7 +21,7 @@ data:
       # Scrape Traefik metrics
       - job_name: 'traefik'
         static_configs:
-          - targets: ['traefik.traefik.svc.cluster.local:9100']
+          - targets: ['traefik-metrics.traefik.svc.cluster.local:9100']
         metric_relabel_configs:
           # Keep only metrics we care about for pageviews
           - source_labels: [__name__]
@@ -155,7 +155,7 @@ metadata:
   annotations:
     cert-manager.io/cluster-issuer: letsencrypt-dns01
     traefik.ingress.kubernetes.io/router.entrypoints: websecure
-    traefik.ingress.kubernetes.io/router.middlewares: traefik-internal-whitelist@kubernetescrd
+    traefik.ingress.kubernetes.io/router.middlewares: default-internal-whitelist@kubernetescrd
 spec:
   tls:
     - hosts: [prometheus.mangelschots.org]
