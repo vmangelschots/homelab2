@@ -1,4 +1,11 @@
-
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: proxmox-exporter
+  labels:
+    app.kubernetes.io/name: proxmox-exporter
+    app.kubernetes.io/instance: proxmox-exporter
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -19,32 +26,27 @@ spec:
         app.kubernetes.io/name: proxmox-exporter
         app.kubernetes.io/instance: proxmox-exporter
     spec:
+      volumes:
+        - name: config
+          secret:
+            secretName: proxmox-exporter-config
       containers:
         - name: proxmox-exporter
           image: prompve/prometheus-pve-exporter:latest
           imagePullPolicy: IfNotPresent
-          env:
-            - name: PVE_USER
-              valueFrom:
-                secretKeyRef:
-                  name: proxmox-credentials
-                  key: username
-            - name: PVE_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: proxmox-credentials
-                  key: password
-            - name: PVE_VERIFY_SSL
-              value: "false"
           args:
-            - "172.21.0.2"
+            - --config.file=/etc/prometheus/pve.yml
           ports:
             - containerPort: 9221
               name: metrics
               protocol: TCP
+          volumeMounts:
+            - name: config
+              mountPath: /etc/prometheus
+              readOnly: true
           livenessProbe:
             httpGet:
-              path: /pve
+              path: /pve?target=172.21.0.2
               port: metrics
             initialDelaySeconds: 30
             periodSeconds: 30
@@ -52,7 +54,7 @@ spec:
             failureThreshold: 3
           readinessProbe:
             httpGet:
-              path: /pve
+              path: /pve?target=172.21.0.2
               port: metrics
             initialDelaySeconds: 10
             periodSeconds: 10
