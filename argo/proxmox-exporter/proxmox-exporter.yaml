@@ -30,6 +30,8 @@ spec:
         - name: config
           secret:
             secretName: proxmox-exporter-config
+        - name: tmp
+          emptyDir: {}
       containers:
         - name: proxmox-exporter
           image: prompve/prometheus-pve-exporter:latest
@@ -44,6 +46,8 @@ spec:
             - name: config
               mountPath: /etc/prometheus
               readOnly: true
+            - name: tmp
+              mountPath: /tmp
           livenessProbe:
             httpGet:
               path: /pve?target=172.21.0.2
