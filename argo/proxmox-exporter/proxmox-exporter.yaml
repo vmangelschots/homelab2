@@ -1,0 +1,112 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: proxmox-exporter
+  labels:
+    app.kubernetes.io/name: proxmox-exporter
+    app.kubernetes.io/instance: proxmox-exporter
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: proxmox-exporter-config
+  namespace: proxmox-exporter
+data:
+  pve.yml: |
+    default:
+      user: prometheus@pve
+      password: ${PROXMOX_PASSWORD}
+      verify_ssl: false
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: proxmox-exporter
+  namespace: proxmox-exporter
+  labels:
+    app.kubernetes.io/name: proxmox-exporter
+    app.kubernetes.io/instance: proxmox-exporter
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: proxmox-exporter
+  template:
+    metadata:
+      labels:
+        app: proxmox-exporter
+        app.kubernetes.io/name: proxmox-exporter
+        app.kubernetes.io/instance: proxmox-exporter
+    spec:
+      containers:
+        - name: proxmox-exporter
+          image: prompve/prometheus-pve-exporter:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: PVE_USER
+              valueFrom:
+                secretKeyRef:
+                  name: proxmox-credentials
+                  key: username
+            - name: PVE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: proxmox-credentials
+                  key: password
+            - name: PVE_VERIFY_SSL
+              value: "false"
+          args:
+            - "172.21.0.2"
+          ports:
+            - containerPort: 9221
+              name: metrics
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /pve
+              port: metrics
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /pve
+              port: metrics
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 65534
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: proxmox-exporter
+  namespace: proxmox-exporter
+  labels:
+    app.kubernetes.io/name: proxmox-exporter
+    app.kubernetes.io/instance: proxmox-exporter
+spec:
+  type: ClusterIP
+  selector:
+    app: proxmox-exporter
+  ports:
+    - name: metrics
+      port: 9221
+      targetPort: 9221
+      protocol: TCP
