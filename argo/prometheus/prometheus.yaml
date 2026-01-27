@@ -31,9 +31,29 @@ data:
       # Scrape Proxmox metrics
       - job_name: 'proxmox'
         static_configs:
-          - targets: ['proxmox-exporter.proxmox-exporter.svc.cluster.local:9221']
+          - targets:
+            - 172.21.0.2  # Proxmox host IP
+        metrics_path: /pve
+        params:
+          module: [default]
+        relabel_configs:
+          - source_labels: [__address__]
+            target_label: __param_target
+          - source_labels: [__param_target]
+            target_label: instance
+          - target_label: __address__
+            replacement: proxmox-exporter.proxmox-exporter.svc.cluster.local:9221
         scrape_interval: 60s
         scrape_timeout: 30s
+      
+      # Scrape Jellyfin metrics
+      - job_name: 'jellyfin'
+        static_configs:
+          - targets: ['jellyfin-external.jellyfin.svc.cluster.local:80']
+        scheme: http
+        metrics_path: /metrics
+        scrape_interval: 30s
+        scrape_timeout: 10s
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
