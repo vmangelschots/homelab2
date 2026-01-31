@@ -75,7 +75,7 @@ spec:
         name: data
       spec:
         accessModes: ["ReadWriteOnce"]
-        storageClassName: nfs-retain
+        storageClassName: truenas-iscsi
         resources:
           requests:
             storage: 20Gi
@@ -89,7 +89,7 @@ metadata:
     ingressClass: traefik
     traefik.ingress.kubernetes.io/router.entrypoints: websecure
     cert-manager.io/cluster-issuer: letsencrypt-dns01
-    traefik.ingress.kubernetes.io/router.middlewares: "internal-whitelist"
+    traefik.ingress.kubernetes.io/router.middlewares: "default-internal-whitelist@kubernetescrd"
 spec:
   rules:
     - host: influxdb.mangelschots.org   
