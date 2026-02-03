@@ -1,0 +1,108 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wekan
+  namespace: wekan
+  labels:
+    app.kubernetes.io/name: wekan
+    app.kubernetes.io/instance: wekan
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: wekan
+      app.kubernetes.io/instance: wekan
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: wekan
+        app.kubernetes.io/instance: wekan
+    spec:
+      containers:
+        - name: wekan
+          image: quay.io/wekan/wekan:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          env:
+            - name: MONGO_URL
+              value: "mongodb://mongodb-svc:27017/wekan"
+            - name: ROOT_URL
+              value: "https://wekan.mangelschots.org"
+            - name: WITH_API
+              value: "true"
+            - name: BROWSER_POLICY_ENABLED
+              value: "true"
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 60
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: wekan-data
+      terminationGracePeriodSeconds: 30
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: wekan-svc
+  namespace: wekan
+  labels:
+    app.kubernetes.io/name: wekan
+spec:
+  selector:
+    app.kubernetes.io/name: wekan
+    app.kubernetes.io/instance: wekan
+  ports:
+    - name: http
+      protocol: TCP
+      port: 8080
+      targetPort: 8080
+  type: ClusterIP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: wekan
+  namespace: wekan
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-dns01
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+spec:
+  tls:
+    - hosts:
+        - wekan.mangelschots.org
+      secretName: wekan-mangelschots-org-tls
+  rules:
+    - host: wekan.mangelschots.org
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: wekan-svc
+                port:
+                  number: 8080
