@@ -1,0 +1,143 @@
+---
+# Plausible Analytics Main Application
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: plausible
+  namespace: plausible
+  labels:
+    app: plausible
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: plausible
+  template:
+    metadata:
+      labels:
+        app: plausible
+    spec:
+      initContainers:
+      - name: plausible-init
+        image: plausible/analytics:latest
+        command:
+        - /bin/sh
+        - -c
+        - |
+          export DATABASE_URL="postgres://plausible:${POSTGRES_PASSWORD}@plausible-postgres.plausible.svc.cluster.local:5432/plausible"
+          export CLICKHOUSE_DATABASE_URL="http://plausible:${CLICKHOUSE_PASSWORD}@plausible-clickhouse.plausible.svc.cluster.local:8123/plausible"
+          sleep 10 && /entrypoint.sh db createdb && /entrypoint.sh db migrate
+        env:
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: plausible-secret
+              key: POSTGRES_PASSWORD
+        - name: CLICKHOUSE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: plausible-secret
+              key: CLICKHOUSE_PASSWORD
+        envFrom:
+        - configMapRef:
+            name: plausible-config
+        - secretRef:
+            name: plausible-secret
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+      containers:
+      - name: plausible
+        image: plausible/analytics:latest
+        command:
+        - /bin/sh
+        - -c
+        - |
+          export DATABASE_URL="postgres://plausible:${POSTGRES_PASSWORD}@plausible-postgres.plausible.svc.cluster.local:5432/plausible"
+          export CLICKHOUSE_DATABASE_URL="http://plausible:${CLICKHOUSE_PASSWORD}@plausible-clickhouse.plausible.svc.cluster.local:8123/plausible"
+          /entrypoint.sh run
+        ports:
+        - containerPort: 8000
+          name: http
+        env:
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: plausible-secret
+              key: POSTGRES_PASSWORD
+        - name: CLICKHOUSE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: plausible-secret
+              key: CLICKHOUSE_PASSWORD
+        envFrom:
+        - configMapRef:
+            name: plausible-config
+        - secretRef:
+            name: plausible-secret
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /api/health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+        readinessProbe:
+          httpGet:
+            path: /api/health
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: plausible
+  namespace: plausible
+spec:
+  selector:
+    app: plausible
+  ports:
+  - port: 80
+    targetPort: 8000
+    name: http
+  type: ClusterIP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: plausible
+  namespace: plausible
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-dns01
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+spec:
+  ingressClassName: traefik
+  tls:
+  - hosts:
+    - analytics.mangelschots.org
+    secretName: plausible-tls
+  rules:
+  - host: analytics.mangelschots.org
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: plausible
+            port:
+              number: 80

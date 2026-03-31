@@ -1,0 +1,26 @@
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: piwigo-mysql-data
+  namespace: broek
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: nfs-retain
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: piwigo-data
+  namespace: broek
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 50Gi
+  storageClassName: nfs-retain

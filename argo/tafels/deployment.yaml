@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tafels
+  namespace: tafels
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tafels
+  template:
+    metadata:
+      labels:
+        app: tafels
+    spec:
+      containers:
+        - name: tafels
+          image: ghcr.io/vmangelschots/tafels:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 80
+      imagePullSecrets:
+        - name: regcred
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tafels
+  namespace: tafels
+spec:
+  selector:
+    app: tafels
+  ports:
+    - port: 80
+      targetPort: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: tafels
+  namespace: tafels
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-dns01
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - tafels.mangelschots.org
+      secretName: tafels-cert
+  rules:
+    - host: tafels.mangelschots.org
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: tafels
+                port:
+                  number: 80
+

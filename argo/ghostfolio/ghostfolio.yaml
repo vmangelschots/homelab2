@@ -1,0 +1,146 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ghostfolio
+  namespace: ghostfolio
+  labels:
+    app.kubernetes.io/name: ghostfolio
+    app.kubernetes.io/instance: ghostfolio
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ghostfolio
+  template:
+    metadata:
+      labels:
+        app: ghostfolio
+    spec:
+      initContainers:
+        - name: wait-for-postgres
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              until nc -z postgres-svc 5432; do
+                echo "Waiting for PostgreSQL to be ready..."
+                sleep 2
+              done
+              echo "PostgreSQL is ready!"
+      containers:
+        - name: ghostfolio
+          image: ghostfolio/ghostfolio:latest
+          imagePullPolicy: Always
+          command:
+            - /bin/sh
+            - -c
+            - |
+              export DATABASE_URL="postgresql://ghostfolio:${POSTGRES_PASSWORD}@postgres-svc:5432/ghostfolio?sslmode=prefer"
+              exec /ghostfolio/entrypoint.sh
+          ports:
+            - containerPort: 3333
+              name: http
+          env:
+            - name: REDIS_HOST
+              value: redis-svc
+            - name: REDIS_PORT
+              value: "6379"
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ghostfolio-secret
+                  key: REDIS_PASSWORD
+            - name: REDIS_DB
+              value: "0"
+            - name: ACCESS_TOKEN_SALT
+              valueFrom:
+                secretKeyRef:
+                  name: ghostfolio-secret
+                  key: ACCESS_TOKEN_SALT
+            - name: JWT_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: ghostfolio-secret
+                  key: JWT_SECRET_KEY
+            - name: POSTGRES_DB
+              value: ghostfolio
+            - name: POSTGRES_USER
+              value: ghostfolio
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ghostfolio-secret
+                  key: POSTGRES_PASSWORD
+            - name: HOST
+              value: 0.0.0.0
+            - name: PORT
+              value: "3333"
+            - name: BASE_CURRENCY
+              value: "EUR"
+            - name: ENABLE_FEATURE_AUTH_TOKEN
+              value: "true"
+          readinessProbe:
+            httpGet:
+              path: /api/v1/health
+              port: 3333
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /api/v1/health
+              port: 3333
+            initialDelaySeconds: 60
+            periodSeconds: 15
+            timeoutSeconds: 5
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ghostfolio-svc
+  namespace: ghostfolio
+  labels:
+    app.kubernetes.io/name: ghostfolio
+spec:
+  type: ClusterIP
+  selector:
+    app: ghostfolio
+  ports:
+    - name: http
+      protocol: TCP
+      port: 3333
+      targetPort: 3333
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ghostfolio
+  namespace: ghostfolio
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-dns01
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - ghostfolio.mangelschots.org
+      secretName: ghostfolio-tls
+  rules:
+    - host: ghostfolio.mangelschots.org
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ghostfolio-svc
+                port:
+                  number: 3333

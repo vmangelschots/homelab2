@@ -114,8 +114,15 @@ spec:
                 secretKeyRef:
                   name: cellarium-secrets
                   key: DATABASE_URL
-
-                
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: cellarium-secrets
+                  key: OPENAI_API_KEY
+            - name: OPENAI_MODEL
+              value: "gpt-4o"
+            - name: OPENAI_MAX_IMAGE_SIZE
+              value: "1024"
             - name: CORS_ALLOW_ALL_ORIGINS
               value: "True"
           volumeMounts:

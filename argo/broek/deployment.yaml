@@ -1,0 +1,78 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: broek
+  namespace: broek
+  labels:
+    app: broek
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: broek
+  template:
+    metadata:
+      labels:
+        app: broek
+    spec:
+      containers:
+        - name: broek
+          image: ghcr.io/vmangelschots/broek:latest
+          ports:
+            - containerPort: 4321
+              name: http
+          env:
+            - name: GOOGLE_CALENDAR_EMBED_URL
+              value: "https://calendar.google.com/calendar/embed?src=c39d3052a0b34089de6ae44818ea67598f42b21bc2b39fba25afa334fe0139ef%40group.calendar.google.com&ctz=Europe%2FBrussels"
+            - name: PIWIGO_BASE_URL
+              value: "http://piwigo-svc.broek.svc.cluster.local"
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: broek-svc
+  namespace: broek
+  labels:
+    app: broek
+spec:
+  type: ClusterIP
+  selector:
+    app: broek
+  ports:
+    - name: http
+      protocol: TCP
+      port: 80
+      targetPort: 4321
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: broek
+  namespace: broek
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-dns01
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - broek.mangelschots.org
+      secretName: broek-tls
+  rules:
+    - host: broek.mangelschots.org
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: broek-svc
+                port:
+                  number: 80

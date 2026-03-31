@@ -1,0 +1,154 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ghost
+  namespace: ghost
+  labels:
+    app.kubernetes.io/name: ghost
+    app.kubernetes.io/instance: ghost
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ghost
+      app.kubernetes.io/instance: ghost
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ghost
+        app.kubernetes.io/instance: ghost
+    spec:
+      initContainers:
+        - name: fix-permissions
+          image: busybox:latest
+          command: ['sh', '-c', 'chown -R 1000:1000 /var/lib/ghost/content || true']
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/ghost/content
+          securityContext:
+            runAsUser: 0
+      containers:
+        - name: ghost
+          image: ghost:5-alpine
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            runAsUser: 1000
+            runAsGroup: 1000
+          ports:
+            - name: http
+              containerPort: 2368
+              protocol: TCP
+          env:
+            - name: url
+              value: "https://blog.mangelschots.org"
+            - name: database__client
+              value: "mysql"
+            - name: database__connection__host
+              value: "mysql-svc"
+            - name: database__connection__port
+              value: "3306"
+            - name: database__connection__user
+              value: "ghost"
+            - name: database__connection__password
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-secret
+                  key: mysql-password
+            - name: database__connection__database
+              value: "ghost"
+            - name: NODE_ENV
+              value: "production"
+            - name: mail__transport
+              value: "SMTP"
+            - name: mail__options__host
+              value: "smtp.eu.mailgun.org"
+            - name: mail__options__port
+              value: "587"
+            - name: mail__options__auth__user
+              value: "vincent@blog.mangelschots.org"
+            - name: mail__options__auth__pass
+              valueFrom:
+                secretKeyRef:
+                  name: smtp-secret
+                  key: smtp-password
+            - name: mail__from
+              value: "vincent@blog.mangelschots.org"
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/ghost/content
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 2368
+              httpHeaders:
+                - name: X-Forwarded-Proto
+                  value: https
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 2368
+              httpHeaders:
+                - name: X-Forwarded-Proto
+                  value: https
+            initialDelaySeconds: 60
+            periodSeconds: 20
+            timeoutSeconds: 5
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 1000m
+              memory: 512Mi
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: ghost-data
+      terminationGracePeriodSeconds: 30
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ghost-svc
+  namespace: ghost
+  labels:
+    app.kubernetes.io/name: ghost
+spec:
+  selector:
+    app.kubernetes.io/name: ghost
+    app.kubernetes.io/instance: ghost
+  ports:
+    - name: http
+      protocol: TCP
+      port: 2368
+      targetPort: 2368
+  type: ClusterIP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ghost
+  namespace: ghost
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-dns01
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+spec:
+  tls:
+    - hosts:
+        - blog.mangelschots.org
+      secretName: blog-mangelschots-org-tls
+  rules:
+    - host: blog.mangelschots.org
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ghost-svc
+                port:
+                  number: 2368

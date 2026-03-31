@@ -57,7 +57,7 @@ spec:
             claimName: scrumpoker-data
       containers:
         - name: scrumpoker
-          image: axeleroy/self-host-planning-poker:latest   # consider pinning a version when you can
+          image: ghcr.io/vmangelschots/self-host-planning-poker:latest   # consider pinning a version when you can
           imagePullPolicy: Always
           ports:
             - containerPort: 8000

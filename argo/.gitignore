@@ -1,0 +1,8 @@
+# Ignore all secret files across all directories
+**/*-secret.yaml
+**/*.secret.yaml
+**/secret.yaml
+**/secrets.yaml
+
+# Keep example files
+!**/*.example
