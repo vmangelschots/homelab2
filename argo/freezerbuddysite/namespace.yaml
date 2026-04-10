@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: fbsite
+  labels:
+    app.kubernetes.io/name: fbsite 
+    app.kubernetes.io/instance: fbsite 

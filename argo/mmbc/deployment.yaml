@@ -21,12 +21,12 @@ spec:
         app: mmbc
     spec:
       containers:
-      - image: ghcr.io/vmangelschots/mmbc:dev # < the name of the docker image we will use
+      - image: ghcr.io/vmangelschots/mmbc:latest # < the name of the docker image we will use
         name: mmbc                      # < name of container
         imagePullPolicy: Always             # < always use the latest image when creating container/pod
         env:                                # < the environment variables required (see container documentation)
         - name: P1_HOST
-          value: "http://172.21.2.226"
+          value: "http://172.21.2.229"
         - name: BATTERY_1_IP
           value: "192.168.6.52" #
         - name: BATTERY_1_ADDRESS

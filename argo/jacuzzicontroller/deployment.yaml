@@ -1,0 +1,60 @@
+ConfigMap — voor de rest:                                                                                                                  
+apiVersion: v1
+kind: ConfigMap                                                                                                                            
+metadata:                                                                              
+  name: bwalink-config                 
+  namespace: jacuzzicontroller
+data:                         
+BWA_SPA_URI: "tcp://172.21.2.138:8899"                                                                                                         
+--
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jacuzzicontroller 
+  namespace: jacuzzicontroller 
+  labels:
+    app: jacuzzicontroller 
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: jacuzzicontroller 
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
+  template:
+    metadata:
+      labels:
+        app: jacuzzicontroller 
+    spec:
+      # tighten defaults a bit
+      securityContext:
+        runAsUser: 568
+        runAsGroup: 568
+        fsGroup: 568
+        fsGroupChangePolicy: OnRootMismatch
+      containers:
+        - name: bwalink
+          image: ghcr.io/vmangelschots/jacuzzicontroller:latest
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - secretRef:
+                name: bwalink-mqtt
+            - configMapRef:
+                name: bwalink-config
+          resources:
+            requests:
+              cpu: 10m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+      terminationGracePeriodSeconds: 10
+
