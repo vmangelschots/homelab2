@@ -5,8 +5,9 @@ metadata:
   name: bwalink-config                 
   namespace: jacuzzicontroller
 data:                         
-BWA_SPA_URI: "tcp://172.21.2.138:8899"                                                                                                         
---
+  BWA_SPA_URI: "tcp://172.21.2.138:8899"
+  LOG_LEVEL: "DEBUG"
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -38,7 +39,7 @@ spec:
       containers:
         - name: bwalink
           image: ghcr.io/vmangelschots/jacuzzicontroller:latest
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always 
           envFrom:
             - secretRef:
                 name: bwalink-mqtt
