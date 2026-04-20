@@ -82,12 +82,12 @@ spec:
               value: /home/inventree/data/media
             - name: INVENTREE_STATIC_ROOT
               value: /home/inventree/data/static
-            - name: INVENTREE_BASE_URL
+            - name: INVENTREE_SITE_URL
               value: https://inventree.mangelschots.org
             - name: INVENTREE_ALLOWED_HOSTS
               value: inventree.mangelschots.org
-            - name: INVENTREE_CORS_ORIGIN_ALLOW_ALL
-              value: "False"
+            - name: INVENTREE_CSRF_TRUSTED_ORIGINS
+              value: https://inventree.mangelschots.org
             - name: INVENTREE_WEB_ADDR
               value: "0.0.0.0"
             - name: INVENTREE_WEB_PORT
