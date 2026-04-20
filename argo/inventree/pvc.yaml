@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-data
+  namespace: inventree
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: truenas-iscsi
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: inventree-data
+  namespace: inventree
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: nfs-retain
+  resources:
+    requests:
+      storage: 20Gi
