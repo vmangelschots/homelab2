@@ -43,13 +43,12 @@ spec:
         - name: inventree-server
           image: inventree/inventree:stable
           imagePullPolicy: Always
-          command:
-            - invoke
-            - server
           ports:
             - containerPort: 8000
               name: http
           env:
+            - name: INVENTREE_DOCKER_TASK
+              value: server
             - name: INVENTREE_DB_ENGINE
               value: postgresql
             - name: INVENTREE_DB_NAME
@@ -156,10 +155,9 @@ spec:
         - name: inventree-worker
           image: inventree/inventree:stable
           imagePullPolicy: Always
-          command:
-            - invoke
-            - worker
           env:
+            - name: INVENTREE_DOCKER_TASK
+              value: worker
             - name: INVENTREE_DB_ENGINE
               value: postgresql
             - name: INVENTREE_DB_NAME
