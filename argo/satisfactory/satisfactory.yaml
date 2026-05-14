@@ -1,0 +1,107 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: satisfactory
+  namespace: satisfactory
+  labels:
+    app.kubernetes.io/name: satisfactory
+    app.kubernetes.io/instance: satisfactory
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: satisfactory
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: satisfactory
+    spec:
+      containers:
+        - name: satisfactory
+          image: wolveix/satisfactory-server:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 7777
+              protocol: UDP
+              name: game
+            - containerPort: 15000
+              protocol: UDP
+              name: beacon
+            - containerPort: 15777
+              protocol: UDP
+              name: query
+          env:
+            - name: MAXPLAYERS
+              value: "4"
+            - name: PGID
+              value: "1000"
+            - name: PUID
+              value: "1000"
+            - name: ROOTLESS
+              value: "false"
+            - name: STEAMBETA
+              value: "false"
+          volumeMounts:
+            - name: data
+              mountPath: /config
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - "pgrep -f FactoryServer > /dev/null"
+            initialDelaySeconds: 120
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - "pgrep -f FactoryServer > /dev/null"
+            initialDelaySeconds: 90
+            periodSeconds: 15
+            timeoutSeconds: 10
+            failureThreshold: 5
+          resources:
+            requests:
+              cpu: 1000m
+              memory: 4Gi
+            limits:
+              cpu: 6000m
+              memory: 12Gi
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: satisfactory-data
+      terminationGracePeriodSeconds: 60
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: satisfactory-svc
+  namespace: satisfactory
+  labels:
+    app.kubernetes.io/name: satisfactory
+  annotations:
+    metallb.universe.tf/loadBalancerIPs: 192.168.40.102
+spec:
+  type: LoadBalancer
+  selector:
+    app: satisfactory
+  ports:
+    - name: game
+      protocol: UDP
+      port: 7777
+      targetPort: 7777
+    - name: beacon
+      protocol: UDP
+      port: 15000
+      targetPort: 15000
+    - name: query
+      protocol: UDP
+      port: 15777
+      targetPort: 15777
