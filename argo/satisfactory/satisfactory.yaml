@@ -26,6 +26,9 @@ spec:
             - containerPort: 7777
               protocol: UDP
               name: game
+            - containerPort: 7777
+              protocol: TCP
+              name: api
             - containerPort: 15000
               protocol: UDP
               name: beacon
@@ -95,6 +98,10 @@ spec:
   ports:
     - name: game
       protocol: UDP
+      port: 7777
+      targetPort: 7777
+    - name: api
+      protocol: TCP
       port: 7777
       targetPort: 7777
     - name: beacon
