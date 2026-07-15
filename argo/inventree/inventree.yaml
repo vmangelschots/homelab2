@@ -41,9 +41,8 @@ spec:
               echo "Redis ready."
         - name: migrate
           image: inventree/inventree:stable
+          command: ["invoke", "update"]
           env:
-            - name: INVENTREE_DOCKER_TASK
-              value: migrate
             - name: INVENTREE_DB_ENGINE
               value: postgresql
             - name: INVENTREE_DB_NAME
@@ -68,6 +67,10 @@ spec:
               value: /home/inventree/data/media
             - name: INVENTREE_STATIC_ROOT
               value: /home/inventree/data/static
+            - name: INVENTREE_SITE_URL
+              value: https://inventree.mangelschots.org
+            - name: INVENTREE_CSRF_TRUSTED_ORIGINS
+              value: https://inventree.mangelschots.org
           volumeMounts:
             - name: inventree-data
               mountPath: /home/inventree/data
@@ -117,13 +120,15 @@ spec:
             - name: INVENTREE_SITE_URL
               value: https://inventree.mangelschots.org
             - name: INVENTREE_ALLOWED_HOSTS
-              value: inventree.mangelschots.org
+              value: "*"
             - name: INVENTREE_CSRF_TRUSTED_ORIGINS
               value: https://inventree.mangelschots.org
             - name: INVENTREE_WEB_ADDR
               value: "0.0.0.0"
             - name: INVENTREE_WEB_PORT
               value: "8000"
+            - name: INVENTREE_PLUGINS_ENABLED
+              value: "true"
           volumeMounts:
             - name: inventree-data
               mountPath: /home/inventree/data
@@ -223,6 +228,10 @@ spec:
               value: /home/inventree/data/media
             - name: INVENTREE_STATIC_ROOT
               value: /home/inventree/data/static
+            - name: INVENTREE_SITE_URL
+              value: https://inventree.mangelschots.org
+            - name: INVENTREE_CSRF_TRUSTED_ORIGINS
+              value: https://inventree.mangelschots.org
           volumeMounts:
             - name: inventree-data
               mountPath: /home/inventree/data

@@ -25,7 +25,7 @@ spec:
       containers:
         - name: actual
           image: actualbudget/actual-server:latest
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           ports:
             - name: http
               containerPort: 5006

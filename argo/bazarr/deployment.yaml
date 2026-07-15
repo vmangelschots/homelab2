@@ -87,7 +87,7 @@ spec:
       containers:
         - name: bazarr
           image: lscr.io/linuxserver/bazarr:latest
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always 
           env:
             - { name: PUID, value: "65534" }
             - { name: PGID, value: "65534" }
