@@ -1,0 +1,15 @@
+# Non-secret backend settings. Keep "localhost" in DJANGO_ALLOWED_HOSTS:
+# the kubelet health probes send Host: localhost.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: reconciled-config
+  namespace: reconciled
+data:
+  DJANGO_DEBUG: "false"
+  DJANGO_ALLOWED_HOSTS: reconciled.mangelschots.org,localhost
+  CSRF_TRUSTED_ORIGINS: https://reconciled.mangelschots.org
+  CORS_ALLOWED_ORIGINS: https://reconciled.mangelschots.org
+  DB_HOST: postgres-svc
+  DB_PORT: "5432"
+  DB_NAME: reconciled
