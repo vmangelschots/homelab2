@@ -39,3 +39,9 @@ spec:
           value: '3'
         - name: MQTT_HOST
           value: "172.21.0.3"
+        - name: GRID_MAX_IMPORT_WATTS
+          value: "8000"
+        - name: EVCC_HOST
+          value: "http://172.21.0.6:7070"
+        - name: EVCC_BATTERY_NAME
+          value: "db:14"

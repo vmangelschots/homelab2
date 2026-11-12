@@ -1,0 +1,163 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: telework
+  labels:
+    app.kubernetes.io/name: telework
+    app.kubernetes.io/instance: telework
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: telework
+  template:
+    metadata:
+      labels:
+        app: telework
+    spec:
+      imagePullSecrets:
+        - name: ghcr-pull
+      initContainers:
+        - name: migrate
+          image: ghcr.io/vmangelschots/teleworkchecker:latest
+          imagePullPolicy: Always
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+              i=0
+              until python3 -c "import socket; socket.create_connection(('postgres', 5432), 2)" 2>/dev/null; do
+                i=$((i+1))
+                if [ "$i" -ge 30 ]; then
+                  echo "postgres not reachable after 60s, giving up"
+                  exit 1
+                fi
+                echo "Waiting for postgres to be ready..."
+                sleep 2
+              done
+              python manage.py migrate --noinput
+          env:
+            - name: DATABASE_ENGINE
+              value: "postgres"
+            - name: POSTGRES_HOST
+              value: "postgres"
+            - name: POSTGRES_PORT
+              value: "5432"
+            - name: SECRET_KEY
+              valueFrom:
+                secretKeyRef: { name: telework-secrets, key: SECRET_KEY }
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef: { name: telework-secrets, key: POSTGRES_DB }
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef: { name: telework-secrets, key: POSTGRES_USER }
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: telework-secrets, key: POSTGRES_PASSWORD }
+      containers:
+        - name: web
+          image: ghcr.io/vmangelschots/teleworkchecker:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8000
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          env:
+            - name: TZ
+              value: "Europe/Brussels"
+            - name: DEBUG
+              value: "false"
+            - name: ALLOWED_HOSTS
+              value: "telework.mangelschots.org"
+            - name: DATABASE_ENGINE
+              value: "postgres"
+            - name: POSTGRES_HOST
+              value: "postgres"
+            - name: POSTGRES_PORT
+              value: "5432"
+            - name: SECRET_KEY
+              valueFrom:
+                secretKeyRef: { name: telework-secrets, key: SECRET_KEY }
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef: { name: telework-secrets, key: POSTGRES_DB }
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef: { name: telework-secrets, key: POSTGRES_USER }
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: telework-secrets, key: POSTGRES_PASSWORD }
+          # Probes send an explicit Host header: Django rejects the pod-IP
+          # Host the kubelet uses by default (ALLOWED_HOSTS).
+          startupProbe:
+            httpGet:
+              path: /
+              port: 8000
+              httpHeaders:
+                - name: Host
+                  value: telework.mangelschots.org
+            failureThreshold: 30
+            periodSeconds: 2
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8000
+              httpHeaders:
+                - name: Host
+                  value: telework.mangelschots.org
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8000
+              httpHeaders:
+                - name: Host
+                  value: telework.mangelschots.org
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: telework-svc
+  namespace: telework
+spec:
+  selector:
+    app: telework
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: telework
+  namespace: telework
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-dns01
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - telework.mangelschots.org
+      secretName: telework-mangelschots-org-tls
+  rules:
+    - host: telework.mangelschots.org
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: telework-svc
+                port:
+                  number: 8000

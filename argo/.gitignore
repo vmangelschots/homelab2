@@ -3,6 +3,7 @@
 **/*.secret.yaml
 **/secret.yaml
 **/secrets.yaml
+**/*credentials*.csv
 
 # Keep example files
 !**/*.example

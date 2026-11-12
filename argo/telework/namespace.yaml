@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: telework
+  labels:
+    app.kubernetes.io/name: telework
+    app.kubernetes.io/instance: telework

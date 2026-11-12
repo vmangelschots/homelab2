@@ -38,8 +38,8 @@ spec:
         fsGroupChangePolicy: OnRootMismatch
       containers:
         - name: jellyseerr
-          image: fallenbagel/jellyseerr:latest
-          imagePullPolicy: IfNotPresent
+          image: seerr/seerr:latest
+          imagePullPolicy: Always 
           ports:
             - containerPort: 5055
           env:

@@ -1,0 +1,334 @@
+# Flitsen — full stack for the homelab cluster.
+#
+# Prerequisites (once, before the first apply):
+#   1. Secrets:      copy k8s/secrets.example.yaml, fill it in, kubectl apply it.
+#   2. Pull secret:  the ghcr.io images are private (built by CI on every push
+#      to main). Create a pull secret with a PAT that has read:packages:
+#        kubectl create secret docker-registry ghcr-pull -n flitsen \
+#          --docker-server=ghcr.io --docker-username=vmangelschots \
+#          --docker-password=<PAT>
+#   3. After first deploy, create the staff account for the word admin:
+#        kubectl exec -n flitsen deploy/backend -it -- python manage.py createsuperuser
+#
+# Migrations and the idempotent seed commands (generate_exercises, load_words)
+# run in the backend pod's initContainer on every rollout.
+#
+# Routing (single-origin, see DEPLOYMENT.md): /api, /admin and /static go to
+# the Django backend; everything else is the SPA. TLS terminates at Traefik,
+# HTTP->HTTPS enforcement is the ingress's job (SECURE_SSL_REDIRECT is off in
+# the app so kubelet probes get plain-HTTP 200s).
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: flitsen
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-data
+  namespace: flitsen
+spec:
+  accessModes: ["ReadWriteOnce"]
+  storageClassName: truenas-iscsi
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: flitsen
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      initContainers:
+        - name: init-postgres-dir
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+              mkdir -p /mnt/pgdata/pgdata
+          volumeMounts:
+            - name: data
+              mountPath: /mnt/pgdata
+      containers:
+        - name: postgres
+          image: postgres:16
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5432
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 1000m
+              memory: 2Gi
+          envFrom:
+            - secretRef:
+                name: flitsen-secrets
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+              subPath: pgdata
+          startupProbe:
+            tcpSocket: { port: 5432 }
+            failureThreshold: 30
+            periodSeconds: 2
+          readinessProbe:
+            tcpSocket: { port: 5432 }
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket: { port: 5432 }
+            periodSeconds: 10
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: postgres-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: flitsen
+spec:
+  selector:
+    app: postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: flitsen
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      imagePullSecrets:
+        - name: ghcr-pull
+      initContainers:
+        - name: migrate
+          image: ghcr.io/vmangelschots/flitsen-backend:latest
+          imagePullPolicy: Always
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+              python manage.py migrate --noinput
+              python manage.py generate_exercises
+              python manage.py load_words
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef: { name: flitsen-secrets, key: DATABASE_URL }
+            - name: SECRET_KEY
+              valueFrom:
+                secretKeyRef: { name: flitsen-secrets, key: SECRET_KEY }
+      containers:
+        - name: backend
+          image: ghcr.io/vmangelschots/flitsen-backend:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8000
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+          env:
+            - name: "PARENT_PASSCODE"
+              value: "edit"
+            - name: TZ
+              value: "Europe/Brussels"
+            - name: ALLOWED_HOSTS
+              value: "flitsen.mangelschots.org"
+            - name: CSRF_TRUSTED_ORIGINS
+              value: "https://flitsen.mangelschots.org"
+            - name: CORS_ALLOWED_ORIGINS
+              value: "https://flitsen.mangelschots.org"
+            - name: FRONTEND_URL
+              value: "https://flitsen.mangelschots.org"
+            - name: DEFAULT_FROM_EMAIL
+              value: "Flits <noreply@mangelschots.org>"
+            # Traefik owns the HTTP->HTTPS redirect; leaving this on would
+            # only bounce the kubelet's plain-HTTP probes with 301s.
+            - name: SECURE_SSL_REDIRECT
+              value: "False"
+            - name: WEB_CONCURRENCY
+              value: "2"
+            - name: SECRET_KEY
+              valueFrom:
+                secretKeyRef: { name: flitsen-secrets, key: SECRET_KEY }
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef: { name: flitsen-secrets, key: DATABASE_URL }
+            - name: EMAIL_URL
+              valueFrom:
+                secretKeyRef: { name: flitsen-secrets, key: EMAIL_URL }
+          # Probes send an explicit Host header: Django rejects the pod-IP
+          # Host the kubelet uses by default (ALLOWED_HOSTS).
+          startupProbe:
+            httpGet:
+              path: /api/v1/health/
+              port: 8000
+              httpHeaders:
+                - name: Host
+                  value: flitsen.mangelschots.org
+            failureThreshold: 30
+            periodSeconds: 2
+          readinessProbe:
+            httpGet:
+              path: /api/v1/health/
+              port: 8000
+              httpHeaders:
+                - name: Host
+                  value: flitsen.mangelschots.org
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /api/v1/health/
+              port: 8000
+              httpHeaders:
+                - name: Host
+                  value: flitsen.mangelschots.org
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-svc
+  namespace: flitsen
+spec:
+  selector:
+    app: backend
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: flitsen
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      imagePullSecrets:
+        - name: ghcr-pull
+      containers:
+        - name: frontend
+          image: ghcr.io/vmangelschots/flitsen-frontend:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          startupProbe:
+            httpGet: { path: /healthz, port: 8080 }
+            failureThreshold: 30
+            periodSeconds: 2
+          readinessProbe:
+            httpGet: { path: /healthz, port: 8080 }
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /healthz, port: 8080 }
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-svc
+  namespace: flitsen
+spec:
+  selector:
+    app: frontend
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: flitsen
+  namespace: flitsen
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-dns01
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - flitsen.mangelschots.org
+      secretName: flitsen-mangelschots-org-tls
+  rules:
+    - host: flitsen.mangelschots.org
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: backend-svc
+                port:
+                  number: 8000
+          - path: /admin
+            pathType: Prefix
+            backend:
+              service:
+                name: backend-svc
+                port:
+                  number: 8000
+          # Whitenoise-served assets for the Django admin.
+          - path: /static
+            pathType: Prefix
+            backend:
+              service:
+                name: backend-svc
+                port:
+                  number: 8000
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend-svc
+                port:
+                  number: 80
+
