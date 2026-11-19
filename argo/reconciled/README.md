@@ -25,6 +25,17 @@ from `BUDGET_APP_USERNAME`/`BUDGET_APP_PASSWORD` (first start only). To change t
 kubectl -n reconciled exec deploy/reconciled-backend -- python manage.py changepassword <user>
 ```
 
+## Bank sync
+
+`bank-sync.yaml` is a CronJob that runs `python manage.py sync_banks` daily at
+11:30 UTC. Keep `BANK_SYNC_TIMES` in `configmap.yaml` equal to its schedule:
+the app only uses it to say when the next sync is. Run one now with:
+
+```sh
+kubectl -n reconciled create job --from=cronjob/bank-sync bank-sync-manual
+kubectl -n reconciled logs -f job/bank-sync-manual
+```
+
 ## Upgrade
 
 Images use `:latest` with `imagePullPolicy: Always`:
@@ -32,6 +43,9 @@ Images use `:latest` with `imagePullPolicy: Always`:
 ```sh
 kubectl -n reconciled rollout restart deploy/reconciled-backend deploy/reconciled-frontend
 ```
+
+A changed `configmap.yaml` needs `kubectl apply -f configmap.yaml` first: pods
+only read it when they start. The bank-sync job pulls the new image on its next run.
 
 The backend uses the `Recreate` strategy so migrations never run while an old version is serving.
 

@@ -13,3 +13,6 @@ data:
   DB_HOST: postgres-svc
   DB_PORT: "5432"
   DB_NAME: reconciled
+  # When the bank-sync CronJob runs, in UTC: keep it equal to the schedule in
+  # bank-sync.yaml. Only used to tell members when the next sync is.
+  BANK_SYNC_TIMES: "11:30"

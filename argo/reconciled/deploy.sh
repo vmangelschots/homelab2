@@ -11,3 +11,4 @@ kubectl -n reconciled rollout status deploy/postgres --timeout=180s
 kubectl apply -f reconciled.yaml
 kubectl -n reconciled rollout status deploy/reconciled-backend --timeout=300s
 kubectl -n reconciled rollout status deploy/reconciled-frontend --timeout=120s
+kubectl apply -f bank-sync.yaml
